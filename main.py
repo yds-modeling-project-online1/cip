@@ -1,3 +1,4 @@
+from data_processing import cipDataset
 import argparse
 
 if __name__ == '__main__':
@@ -14,3 +15,8 @@ if __name__ == '__main__':
 
     # ex) load_path = 'cip/EDA/preprocessing/'           # 데이터 불러오는 경로
     # ex) save_path = 'cip/EDA/processing_result/'       # 데이터 처리 후 데이터 저장하는 경로
+
+    data = cipDataset(args.load_path, args.save_path)
+    
+    train_err_data = data.makeFeatures(args.flag)
+    data.saveDataFrame(train_err_data)
