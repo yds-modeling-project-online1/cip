@@ -25,7 +25,10 @@ class cipDataset():
 
     def makeFeatures(self, flag):   # flag : train 데이터인지 test 데이터인지 선택
         data_filename = input("데이터 파일 이름을 입력해주세요 : ")
-        print("train 데이터 경로 : ", self.data_path + data_filename)
+        if flag == 'train':
+            print("train 데이터 경로 : ", self.data_path + data_filename)
+        else:
+            print("test 데이터 경로 : ", self.data_path + data_filename)
 
         try:
             error_df = pd.read_csv(self.data_path + data_filename)
@@ -71,15 +74,16 @@ class cipDataset():
         # -------------------- 사용자별 데이터로 구축 (별도의 메소드로 구현해주면 좋을듯) --------------------
 
         # train 데이터 설명을 확인하면 user_id가 10000부터 24999까지 총 15000개가 연속적으로 존재.
+        # test 데이터는 user_id가 30000부터 44998까지 총 14999개가 연속적으로 존재. (그런데 데이터에는 중간에 한 id(43262)는 존재하지 않음)
         user_id_max = error_df.user_id.max()
         user_id_min = error_df.user_id.min()
-        user_number = error_df.user_id.nunique()
+        user_number = user_id_max - user_id_min + 1
 
         id_error = error_df_rev1[['user_id','errtype']].values
-        id_errors = {}
+        id_errors ={}
+        for i in range(user_id_min, user_id_max + 1):
+            id_errors[i] = {}
         for u_id, err in tqdm(id_error):
-            if u_id not in id_errors:
-                id_errors[u_id] = {}
             if err not in id_errors[u_id]:
                 id_errors[u_id][err] = 0
             id_errors[u_id][err] += 1
