@@ -43,35 +43,7 @@ class cipDataset():
         # -------------------- time column drop하기 끝 --------------------
 
 
-
-        # -------------------- 펌웨어 버전 변경 유무, 모델 변경 유무 feature 만들기 (별도의 메소드로 구현해주면 좋을듯) --------------------
-
-        # 펌웨어버전 2개 이상에서 오류가 발생한 사용자 리스트
-        alt_fwvers_idx = error_df_rev1.groupby('user_id').nunique()[error_df_rev1.groupby('user_id').nunique().fwver > 1].index
-
-        # 모델 2개 이상에서 오류가 발생한 사용자 리스트
-        alt_models_idx = error_df_rev1.groupby('user_id').nunique()[error_df_rev1.groupby('user_id').nunique().model_nm > 1].index
-
-        alt_fwvers = np.zeros(len(error_df_rev1), dtype=int)
-        alt_models = np.zeros(len(error_df_rev1), dtype=int)
-
-        error_df_rev1['alt_fwver'] = alt_fwvers
-        error_df_rev1['alt_model'] = alt_models
-
-        for idx in tqdm(error_df_rev1[error_df_rev1.user_id.isin(alt_fwvers_idx)].index):
-            alt_fwvers[idx] = 1
-
-        for idx in tqdm(error_df_rev1[error_df_rev1.user_id.isin(alt_models_idx)].index):
-            alt_models[idx] = 1
-
-        error_df_rev1['alt_fwver'] = alt_fwvers
-        error_df_rev1['alt_model'] = alt_models
-
-        # -------------------- 펌웨어 버전 변경 유무, 모델 변경 유무 feature 만들기 끝 --------------------
-
-
-
-        # -------------------- 사용자별 데이터로 구축 (별도의 메소드로 구현해주면 좋을듯) --------------------
+        # -------------------- 사용자별 데이터로 구축 (별도의 메서드로 구현해주면 좋을듯) --------------------
 
         # train 데이터 설명을 확인하면 user_id가 10000부터 24999까지 총 15000개가 연속적으로 존재.
         # test 데이터는 user_id가 30000부터 44998까지 총 14999개가 연속적으로 존재. (그런데 데이터에는 중간에 한 id(43262)는 존재하지 않음)
@@ -79,6 +51,7 @@ class cipDataset():
         user_id_min = error_df.user_id.min()
         user_number = user_id_max - user_id_min + 1
 
+        # -------------------- 사용자별 errtype feature 추가 --------------------
         id_error = error_df_rev1[['user_id','errtype']].values
         id_errors ={}
         for i in range(user_id_min, user_id_max + 1):
@@ -105,15 +78,36 @@ class cipDataset():
         
         error_df_rev2 = pd.concat([error_df_rev2, pd.DataFrame(error.astype(int), columns=col_errtypes)], axis=1).drop('errtype', axis=1)
 
+        # -------------------- 사용자별 errtype feature 추가 끝 --------------------
+
+
+        # -------------------- 사용자별 모델 변경 횟수 feature 추가 (별도의 메서드로 구현해주면 좋을듯) --------------------
+
+        # 모델 2개 이상에서 오류가 발생한 사용자 리스트
+        alt_models_idx = error_df_rev1.groupby('user_id').nunique()[error_df_rev1.groupby('user_id').nunique().model_nm > 1].index
+        # 모델 변경 경험이 있는 사용자의 id와 변경 횟수 dictionary
+        alt_models_dict = error_df_rev1[error_df_rev1.user_id.isin(alt_models_idx)].groupby('user_id').model_nm.nunique().to_dict()
+
         num_models = np.zeros(user_number)
-        for i in tqdm(list(error_df_rev1[error_df_rev1.alt_model != 0].user_id.unique())):
-            num_models[i - user_id_min] = 1
+        for key, value in tqdm(list(alt_models_dict.items())):
+                num_models[key - user_id_min] = value
         error_df_rev2 = pd.concat([error_df_rev2, pd.DataFrame(num_models.astype(int), columns=['alt_model'])], axis=1)
 
+        # -------------------- 사용자별 모델 변경 횟수 feature 추가 끝 --------------------
+
+        # -------------------- 사용자별 펌웨어 버전 변경 횟수 feature 추가 (별도의 메서드로 구현해주면 좋을듯) --------------------
+
+        # 펌웨어버전 2개 이상에서 오류가 발생한 사용자 리스트
+        alt_fwvers_idx = error_df_rev1.groupby('user_id').nunique()[error_df_rev1.groupby('user_id').nunique().fwver > 1].index
+        # 펌웨어버전 변경 경험이 있는 사용자의 id와 변경 횟수 dictionary
+        alt_fwvers_dict = error_df_rev1[error_df_rev1.user_id.isin(alt_fwvers_idx)].groupby('user_id').fwver.nunique().to_dict()
+
         num_fwvers = np.zeros(user_number)
-        for i in tqdm(list(error_df_rev1[error_df_rev1.alt_fwver != 0].user_id.unique())):
-            num_fwvers[i - user_id_min] = 1
+        for key, value in tqdm(list(alt_fwvers_dict.items())):
+            num_fwvers[key - user_id_min] = value
         error_df_rev2 = pd.concat([error_df_rev2, pd.DataFrame(num_fwvers.astype(int), columns=['alt_fwver'])], axis=1)
+
+        # -------------------- 사용자별 펌웨어 버전 변경 횟수 feature 추가 끝 --------------------
 
         # -------------------- 사용자별 데이터로 구축 끝 --------------------
 
