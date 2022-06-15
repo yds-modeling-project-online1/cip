@@ -76,3 +76,5 @@ class preprocess():
         self.test_qual.to_csv(save_path + 'test_quality_data_rev.csv', index=False)
         self.train_prob.to_csv(save_path + 'train_problem_data_rev.csv', index=False)
         print("저장 완료")
+
+        return save_path
