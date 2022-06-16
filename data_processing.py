@@ -3,14 +3,17 @@ import pandas as pd # Analysis
 
 from tqdm import tqdm
 
+from dataloader import dataload
+
+
 class cipDataset():
-    def __init__(self, data_path, save_path):
+    def __init__(self, data_path='./data/', save_path='./processing_result/'):
         self.data_path = data_path          # train, test, problem 데이터 경로
         # self.target_path = target_path      # problem 데이터 경로
         self.save_path = save_path                  # 저장 경로
 
     def labeling(self, train_filename):
-        target_filename = input("target 데이터 파일 이름을 입력해주세요 : ")
+        target_filename = dataload("target 데이터")
         print("train 데이터 경로 : ", self.data_path + train_filename)
         print("target 데이터 경로 : ", self.data_path + target_filename)
 
@@ -24,7 +27,7 @@ class cipDataset():
         return problem
 
     def makeFeatures(self, flag):   # flag : train 데이터인지 test 데이터인지 선택
-        data_filename = input("데이터 파일 이름을 입력해주세요 : ")
+        data_filename = dataload("데이터")
         if flag == 'train':
             print("train 데이터 경로 : ", self.data_path + data_filename)
         else:
@@ -123,10 +126,4 @@ class cipDataset():
 
         return error_df_rev2
 
-    def saveDataFrame(self, df):
-        save_filename = input("저장할 파일 이름을 입력하세요(확장자명도 포함) : ")
-        save_path = self.save_path + save_filename
-        print("저장 경로 : ", save_path)
-
-        df.to_csv(save_path, index=False)
-        print("저장 완료")
+    
