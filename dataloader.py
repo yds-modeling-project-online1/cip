@@ -10,5 +10,5 @@ def dataload(msg):
     if file == '':
         messagebox.showwarning("경고", "파일을 선택해주세요")
 
-    df = pd.read_scv(file)
+    df = pd.read_csv(file)
     return df
