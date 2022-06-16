@@ -1,12 +1,6 @@
 import pandas as pd
 import numpy as np
-import datetime as dt
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-import gc
-import random
 import lightgbm as lgb
-import re
 from sklearn.metrics import *
 from sklearn.model_selection import KFold
 import warnings
@@ -16,28 +10,6 @@ from optuna import Trial, visualization
 from optuna.samplers import TPESampler
 from utils import saveDataFrame
 from dataloader import dataload
-
-# 필요한 함수 정의
-def make_datetime(x):
-    # string 타입의 Time column을 datetime 타입으로 변경
-    x     = str(x)
-    year  = int(x[:4])
-    month = int(x[4:6])
-    day   = int(x[6:8])
-    hour  = int(x[8:10])
-    #mim  = int(x[10:12])
-    #sec  = int(x[12:])
-    return dt.datetime(year, month, day, hour)
-
-def string2num(x):
-    # (,)( )과 같은 불필요한 데이터 정제
-    x = re.sub(r"[^0-9]+", '', str(x))
-    if x =='':
-        return 0
-    else:
-        return int(x)
-
-
 import lightgbm as lgb
 from sklearn.model_selection import train_test_split
 
@@ -59,60 +31,51 @@ class Models():
             pred_y_list.append(pred_y.reshape(-1,1))
             
         pred_ensemble = np.mean(pred_y_list, axis = 0)
-        sample_submssion_filename = dataload('sample submission 파일을 선택해주세요')
-        sample_submssion = pd.read_csv(sample_submssion_filename)
-        sample_submssion['problem'] = pred_ensemble.reshape(-1)
+        sample_submission = dataload('sample submission')
+        sample_submission['problem'] = pred_ensemble.reshape(-1)
 
         save_path = input('추론 결과를 저장할 경로를 입력해주세요 : ')
-        saveDataFrame(save_path, sample_submssion)
-        return sample_submssion
+        saveDataFrame(save_path, sample_submission)
+        return sample_submission
 
-    
-    def LGBM(self):
-        # 초기화
-        train_x = self.dataset.iloc[:, 1:-1] 
-        train_y = self.dataset.iloc[:,-1] 
+    def f_pr_auc(self, probas_pred, y_true):    # optuna
+        p, r, _ = precision_recall_curve(y_true, probas_pred)
+        score=auc(r,p) 
+        return score
+
+    def objective(self, trial):
+        train_x = self.train_dataset.iloc[:, 1:-1] 
+        train_y = self.train_dataset.iloc[:,-1] 
         print(train_x.shape)
         print(train_y.shape)
-
-        # optuna
         train_x, valid_x, train_y, valid_y = train_test_split(train_x, train_y, test_size=0.2, random_state=1)
+        param = {
+            'objective': 'regression', # 회귀
+            'verbose': -1,
+            'metric': 'auc', 
+            'max_depth': trial.suggest_int('max_depth',5, 20),
+            'learning_rate': trial.suggest_loguniform("learning_rate", 1e-8, 0.8),
+            'num_boost_round': trial.suggest_int('num_boost_round',100,1500)
+            # 'n_estimators': trial.suggest_int('n_estimators', 100, 3000),
+            # 'min_child_samples': trial.suggest_int('min_child_samples', 5, 100),
+            # 'subsample': trial.suggest_loguniform('subsample', 0.4, 1),
+        }
 
+        model = lgb.LGBMRegressor(**param)
+        model = model.fit(train_x, train_y, eval_set=[(valid_x, valid_y)], verbose=0, early_stopping_rounds=25)
+        pred = model.predict(valid_x)
+        auc = self.f_pr_auc(pred, valid_y)
+        return auc
+    
+    def LGBM(self):
         sampler = TPESampler(seed=10)
-
-        def f_pr_auc(probas_pred, y_true):
-            # labels = y_true.get_label()
-            p, r, _ = precision_recall_curve(y_true, probas_pred)
-            score=auc(r,p) 
-            return score
-
-        def objective(trial):
-
-            param = {
-                'objective': 'regression', # 회귀
-                'verbose': -1,
-                'metric': 'auc', 
-                'max_depth': trial.suggest_int('max_depth',5, 20),
-                'learning_rate': trial.suggest_loguniform("learning_rate", 1e-8, 0.8),
-                'num_boost_round': trial.suggest_int('num_boost_round',100,1500)
-                # 'n_estimators': trial.suggest_int('n_estimators', 100, 3000),
-                # 'min_child_samples': trial.suggest_int('min_child_samples', 5, 100),
-                # 'subsample': trial.suggest_loguniform('subsample', 0.4, 1),
-            }
-
-            model = lgb.LGBMRegressor(**param)
-            lgb_model = model.fit(train_x, train_y, eval_set=[(valid_x, valid_y)], verbose=0, early_stopping_rounds=25)
-            auc = f_pr_auc(lgb_model.predict(valid_x),valid_y)
-            return auc
-                
         study_lgb = optuna.create_study(direction='maximize', sampler=sampler)
-        study_lgb.optimize(objective, n_trials=100)
-
+        study_lgb.optimize(self.objective, n_trials=50)
         best_params = study_lgb.best_params
 
         # cross validation 전 초기화
-        train_x = self.dataset.iloc[:, 1:-1] 
-        train_y = self.dataset.iloc[:,-1] 
+        train_x = self.train_dataset.iloc[:, 1:-1] 
+        train_y = self.train_dataset.iloc[:,-1] 
         print("K-fold")
         print(train_x.shape)
         print(train_y.shape)
