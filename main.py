@@ -47,6 +47,10 @@ if __name__ == '__main__':
         train_dataset = dataload('train 데이터셋')
         test_dataset = dataload('test 데이터셋')
         
-        model = Models(train_dataset, test_dataset)
+        model = Models(train_dataset, test_dataset, trial=1)
         print(model.LGBM())
+        # print(model.LR())
+        # print(model.XGB())
+        # print(model.XGBRF())
+        # print(model.RF())
         model.inference()
