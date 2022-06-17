@@ -1,6 +1,7 @@
 import numpy as np # Analysis
 import pandas as pd # Analysis
-
+from collections import defaultdict
+from copy import deepcopy
 from tqdm import tqdm
 
 from dataloader import dataload
@@ -12,6 +13,7 @@ class cipDataset():
         self.save_path = save_path                  # 저장 경로
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
+        self.repo_dict = None
 
     def labeling(self, train_df, target_df):
         problem = np.zeros(train_df.user_id.nunique())
@@ -22,6 +24,7 @@ class cipDataset():
         return problem
 
     def makeFeatures(self, df, flag='train'): # flag : train 데이터라면 'train', test 데이터라면 'test'
+        print(flag, ' 데이터 처리 중')
 
         # -------------------- time column drop하기 --------------------
 
@@ -96,14 +99,96 @@ class cipDataset():
 
         # -------------------- 사용자별 펌웨어 버전 변경 횟수 feature 추가 끝 --------------------
 
+        # -------------------- 펌웨어 버전별 신고율 feature 추가 --------------------
+
+        if flag == 'train':
+            # 버전별 신고율
+            target_df = dataload('problem 데이터를 선택해주세요')
+            df_rev1['target'] = df_rev1.user_id.isin(target_df.user_id).astype(int)
+            self.train_dataset = df_rev1
+            repo_count = df_rev1[['fwver','target','user_id']][df_rev1['target']==1].groupby(['fwver','target']).count().reset_index()
+
+            # 버전별 error count를 dictionary 형태로 가공
+            fw_dict = df_rev1['fwver'].value_counts().to_dict()
+
+            # 버전별 신고율/에러 count 통해 버전별 신고율 dictionary 형태로 가공
+            repo_dict = {}
+            for i, row in repo_count.iterrows():
+                sums = fw_dict[repo_count.iloc[i,0]]
+                repo_dict[repo_count.iloc[i,0]] = repo_count.iloc[i,2]/sums
+
+            self.repo_dict = repo_dict
+
+            # 각 user_id가 가지고 있는 fwver 그룹으로 묶음
+            b = df_rev1.groupby(['user_id','fwver']).count()
+            b.reset_index(inplace=True)
+
+            # repo_dict(fwver 별 신고율) user_id 별 신고율 리스트화
+            u_fw = defaultdict(list)
+            for i in range(len(b)):
+                if b.iloc[i,1] in repo_dict:
+                    u_fw[b.iloc[i,0]].append(repo_dict[b.iloc[i,1]])
+
+            # id 당 fwver 별 신고율이기 때문에, 해당 아이디가 가지고 있는 fwver들의 신고율 평균치로 계산
+            # 결과값 final_dict에 저장, 이후 train_err_rev2에 매칭
+            final_dict = {}
+            for j in u_fw.keys():
+                final_dict[j] = np.mean(u_fw[j])
+
+            df_rev2['fw_report'] = 0
+
+            # fwver 별 신고율 추가
+            for i in tqdm(range(len(df_rev2))):
+                if df_rev2.iloc[i,0] in final_dict:
+                    df_rev2.iloc[i,45] = final_dict[df_rev2.iloc[i,0]]
+
+        elif flag == 'test':
+            # test_err에만 존재하는 fwver의 경우 데이터가 없으므로, test 데이터의 fwver 별 평균 신고율로 대체
+            # test_err에만 존재하는 fwver
+            t_fw = list(set(df_rev1['fwver'].unique().tolist())-set(df_rev1['fwver'].unique().tolist()))
+
+            # test 데이터용 repo_dict 제작
+            t_repo_dict = deepcopy(self.repo_dict)
+
+            # test_err에 존재하는 fwver 들의 평균 신고율 (test_repo_rate = trr)
+            trr = (self.train_dataset['target']==1).sum()/len(self.train_dataset)
+
+            # 해당 dict에 test 전용 fwver와 평균 신고율 매칭
+            for i in t_fw:
+                t_repo_dict[i] = trr
+
+            # 각 user_id가 가지고 있는 fwver 그룹으로 묶음
+            c = df_rev1.groupby(['user_id','fwver']).count()
+            c.reset_index(inplace=True)
+
+            # repo_dict(fwver 별 신고율) user_id 별 신고율 리스트화
+            q_fw = defaultdict(list)
+            for i in range(len(c)):
+                if c.iloc[i,1] in t_repo_dict:
+                    q_fw[c.iloc[i,0]].append(t_repo_dict[c.iloc[i,1]])
+
+            # id 당 fwver 별 신고율이기 때문에, 해당 아이디가 가지고 있는 fwver들의 신고율 평균치로 계산
+            # 결과값 t_final_dict에 저장, 이후 test_err_rev2에 매칭
+            t_final_dict = {}
+            for j in q_fw.keys():
+                t_final_dict[j] = np.mean(q_fw[j])
+            
+            df_rev2['fw_report'] = 0
+
+            # fwver 별 신고율 추가
+            for i in tqdm(range(len(df_rev2))):
+                if df_rev2.iloc[i,0] in t_final_dict:
+                    df_rev2.iloc[i,45] = t_final_dict[df_rev2.iloc[i,0]]
+
+        # -------------------- 펌웨어 버전별 신고율 feature 추가 끝 --------------------
+
+
         # -------------------- 사용자별 데이터로 구축 끝 --------------------
 
 
         # -------------------- target column 추가해주기 --------------------
 
         if flag == 'train':
-            target_filename = dataload('problem 데이터를 선택해주세요')
-            target_df = pd.read_csv(target_filename)
             target = self.labeling(df_rev2, target_df)
             df_rev2 = pd.concat([df_rev2, pd.DataFrame(target.astype(int), columns=['target'])], axis=1)
 
