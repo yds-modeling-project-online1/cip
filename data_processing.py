@@ -77,7 +77,7 @@ class cipDataset():
 
         num_models = np.zeros(user_number)
         for key, value in tqdm(list(alt_models_dict.items())):
-                num_models[key - user_id_min] = value
+                num_models[key - user_id_min] = value - 1
         df_rev2 = pd.concat([df_rev2, pd.DataFrame(num_models.astype(int), columns=['alt_model'])], axis=1)
 
         # -------------------- 사용자별 모델 변경 횟수 feature 추가 끝 --------------------
@@ -91,7 +91,7 @@ class cipDataset():
 
         num_fwvers = np.zeros(user_number)
         for key, value in tqdm(list(alt_fwvers_dict.items())):
-            num_fwvers[key - user_id_min] = value
+            num_fwvers[key - user_id_min] = value - 1
         df_rev2 = pd.concat([df_rev2, pd.DataFrame(num_fwvers.astype(int), columns=['alt_fwver'])], axis=1)
 
         # -------------------- 사용자별 펌웨어 버전 변경 횟수 feature 추가 끝 --------------------
