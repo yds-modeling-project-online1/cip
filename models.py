@@ -1,3 +1,4 @@
+from tabnanny import verbose
 import pandas as pd
 import numpy as np
 from sklearn.metrics import *
@@ -38,7 +39,9 @@ class Models():
         sample_submission = dataload('sample submission')
         sample_submission['problem'] = pred_ensemble.reshape(-1)
 
-        save_path = input('추론 결과를 저장할 경로를 입력해주세요 : ')
+        # save_path = input('추론 결과를 저장할 경로를 입력해주세요 : ')
+        save_path = 'submission'
+        print("추론 결과를 저장할 경로 : ", save_path)
         saveDataFrame(save_path, sample_submission)
         return sample_submission
 
@@ -73,7 +76,7 @@ class Models():
             #run traning
             model = select_model(**params)
             if select_model in [lgb.LGBMRegressor, xgb.XGBRegressor, xgb.XGBRFRegressor]:
-                model.fit(X, y, eval_set=[(valid_x, valid_y)], verbose=0)
+                model.fit(X, y, eval_set=[(valid_x, valid_y)], verbose=1)
             else:
                 model.fit(X,y)
 
@@ -93,7 +96,7 @@ class Models():
             auc_scores.append(auc_score)
 
             print('============================ k-fold 실행 중 ============================')
-
+        print(models, recalls, precisions, auc_scores)
         self.result = models, recalls, precisions, auc_scores
 
 
@@ -149,6 +152,7 @@ class Models():
                 'min_child_weight'  : trial.suggest_int("min_child_weight", 1, 10),
                 'gamma'             : trial.suggest_int("gamma", 0, 10),
                 'subsample'         : trial.suggest_float("subsample", 0.5, 1),
+                'eval_metric' : 'auc',
             }
 
             model = xgb.XGBRegressor(**param)
@@ -160,6 +164,7 @@ class Models():
         study = optuna.create_study(direction='maximize', sampler=sampler)
         study.optimize(objective, n_trials = self.trial)
         best_params = study.best_params
+        best_params['eval_metric'] = 'auc'
 
         self.k_folding(best_params, xgb.XGBRegressor)
         return self.result
@@ -177,6 +182,7 @@ class Models():
                 'learning_rate': trial.suggest_loguniform("learning_rate", 1e-8, 1e-2),
                 'num_parallel_tree': trial.suggest_int('num_parallel_tree',5,100),
                 'n_estimators': trial.suggest_int('n_estimators',50,100),
+                'eval_metric' : 'auc',
             }
 
             model = xgb.XGBRFRegressor(**param)
@@ -188,6 +194,7 @@ class Models():
         study = optuna.create_study(direction='maximize', sampler=sampler)
         study.optimize(objective, n_trials = self.trial)
         best_params = study.best_params
+        best_params['eval_metric'] = 'auc'
 
         self.k_folding(best_params, xgb.XGBRFRegressor)
         return self.result
@@ -205,7 +212,7 @@ class Models():
                 'n_estimators': trial.suggest_int('n_estimators', 15, 100),
                 'max_depth' : trial.suggest_int('max_depth', 9, 20),
                 'min_samples_leaf' : trial.suggest_int('min_samples_leaf', 3, 15),
-                'min_samples_split' : trial.suggest_int('min_samples_split', 5, 20)
+                'min_samples_split' : trial.suggest_int('min_samples_split', 5, 20),
             }
 
             model = RandomForestRegressor(**param)
