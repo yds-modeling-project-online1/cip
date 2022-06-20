@@ -21,7 +21,7 @@ if __name__ == '__main__':
     # ex) load_path = 'cip/EDA/preprocessing/'           # 데이터 불러오는 경로
     # ex) save_path = 'cip/EDA/processing_result/'       # 데이터 처리 후 데이터 저장하는 경로
 
-    if args.flag == 1:
+    if args.flag == 0:
         train_err = dataload("train error 데이터")
         train_qual = dataload("train quality 데이터")
         train_prob = dataload("train problem 데이터")
@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
         preproc = preprocess(train_err, train_qual, train_prob, test_err, test_qual)
 
-    if args.flag <= 1:
+    if 0 < args.flag <= 1:
         train_data = dataload('전처리된 train error 데이터')
         test_data = dataload('전처리된 test error 데이터')
         data = cipDataset(train_data, test_data, args.load_path, args.save_path)
@@ -39,18 +39,14 @@ if __name__ == '__main__':
         saveDataFrame(args.save_path, train_dataset)
         saveDataFrame(args.save_path, test_dataset)
 
-        model = Models(train_dataset, test_dataset)
-        print(model.LGBM())
-        model.inference()
-
-    else:
+    if args.flag <= 2:
         train_dataset = dataload('train 데이터셋')
         test_dataset = dataload('test 데이터셋')
         
-        model = Models(train_dataset, test_dataset, trial=1)
-        print(model.LGBM())
-        # print(model.LR())
-        # print(model.XGB())
-        # print(model.XGBRF())
-        # print(model.RF())
-        model.inference()
+    model = Models(train_dataset, test_dataset, trial=1000)
+    # print(model.LGBM())
+    # print(model.LR())
+    print(model.XGB())
+    # print(model.XGBRF())
+    # print(model.RF())
+    model.inference()
