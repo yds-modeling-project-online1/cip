@@ -30,10 +30,17 @@ class Models():
 
         # 예측
         pred_y_list = []
+        # kfold 평균
         models, _, _, _ = self.result
         for model in models:
             pred_y = model.predict(test_x)
             pred_y_list.append(pred_y.reshape(-1,1))
+
+        # # kfold 중 auc best
+        # models, recalls, precisions, auc_scores = self.result
+        # max_idx = np.argmax(auc_scores)
+        # pred_y = models[max_idx].predict(test_x)
+        # pred_y_list.append(pred_y.reshape(-1,1))
             
         pred_ensemble = np.mean(pred_y_list, axis = 0)
         sample_submission = dataload('sample submission')
@@ -43,6 +50,7 @@ class Models():
         save_path = 'submission'
         print("추론 결과를 저장할 경로 : ", save_path)
         saveDataFrame(save_path, sample_submission)
+        print("submission 저장 완료")
         return sample_submission
 
     def f_pr_auc(self, probas_pred, y_true):    # optuna
